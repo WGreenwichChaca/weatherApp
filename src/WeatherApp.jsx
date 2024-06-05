@@ -15,20 +15,28 @@ export const WeatherApp = () => {
   const [ciudad, setCiudad] = useState("");
   const [dataClima, setdataClima] = useState(null);
   const [fechaHora, setFechaHora] = useState("");
+  const [unidad, setUnidad] = useState("metric");
 
   const handleCambioCiudad = (e) => {
     setCiudad(e.target.value);
   };
 
+  const handleUnidadCambio = (unidadSeleccionada) => {
+    setUnidad(unidadSeleccionada);
+    if (ciudad.length > 0) {
+      fetchClima(unidadSeleccionada); 
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (ciudad.length > 0) {
-      await fetchClima();
+      await fetchClima(unidad);
       setCiudad("");
     }
   };
 
-  const fetchClima = async () => {
+  const fetchClima = async (unidad) => {
     try {
       const now = new Date();
       const formattedDate = format(now, "EEEE, d 'de' MMMM 'de' yyyy, p", {
@@ -36,15 +44,19 @@ export const WeatherApp = () => {
       });
       setFechaHora(formattedDate);
 
-      const response = await fetch(`${urlBase}?q=${ciudad}&appid=${API_KEY}&lang=es`);
+      const response = await fetch(`${urlBase}?q=${ciudad}&appid=${API_KEY}&units=${unidad}&lang=es`);
+
       const data = await response.json();
-      setdataClima(data);
+
+      const countryName = getName(data.sys.country, "es");
+      setdataClima({ ...data, countryName });
     } catch (error) {
       console.error("Ocurrió el siguiente problema: ", error);
     }
   };
 
   const convertWindSpeed = (speed, unit) => {
+    if (speed === undefined || speed === null) return "N/A";
     if (unit === "metric") {
       // Convert from m/s to km/h
       return (speed * 3.6).toFixed(2);
@@ -64,9 +76,15 @@ export const WeatherApp = () => {
     return "m/s";
   };
 
-  const getUnitType = () => {
-    // This function can be extended to determine the unit type (metric/imperial) based on user settings or API response
-    return "metric"; // Assuming metric for now, adjust based on actual usage
+  const getTemperatureUnit = () => (unidad === "metric" ? "°C" : "°F");
+
+  const displayTemperature = (temp) => {
+    if (temp === undefined || temp === null || isNaN(temp)) {
+      return "N/A";
+    }
+    return unidad === "metric"
+      ? `${Math.round(temp)}`
+      : `${Math.round((temp * 9/5) + 32)}`;
   };
 
   return (
@@ -90,8 +108,12 @@ export const WeatherApp = () => {
             />
           </form>
           <div className="text-lg sm:text-xl lg:text-2xl flex items-center">
-            <span className="mr-2">°C</span>
-            <span>°F</span>
+            <button onClick={() => handleUnidadCambio("metric")} className={`mr-2 ${unidad === "metric" ? "font-bold" : ""}`}>
+              °C
+            </button>
+            <button onClick={() => handleUnidadCambio("imperial")} className={`${unidad === "imperial" ? "font-bold" : ""}`}>
+              °F
+            </button>
           </div>
         </div>
         <div className="weather__body flex flex-col items-center justify-center">
@@ -103,135 +125,41 @@ export const WeatherApp = () => {
               <div className="mb-5">
                 <p>{fechaHora}</p>
               </div>
-              <div className="mb-2">{dataClima.weather[0].description}</div>
+              <div className="rounded-full bg-neutral-800 mb-2 py-2 px-4 mx-auto">{dataClima.weather[0].description}</div>
               <div className="mb-2 flex justify-center">
                 <WeatherIcon iconCode={dataClima?.weather[0]?.icon} />
               </div>
-              <p className="text-2xl mb-2">Temperatura: {Math.round(dataClima.main.temp - difKelvin)}°C</p>
+              <p className="text-3xl mb-2">{displayTemperature(dataClima.main.temp)}{getTemperatureUnit()}</p>
               <div className="mb-2">
-                <p>Min: {Math.round(dataClima.main.temp_min - difKelvin)}°</p>
-                <p>Max: {Math.round(dataClima.main.temp_max - difKelvin)}°</p>
+                <p>Min: {displayTemperature(dataClima.main.temp_min)}{getTemperatureUnit()}</p>
+                <p>Max: {displayTemperature(dataClima.main.temp_max)}{getTemperatureUnit()}</p>
               </div>
             </div>
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4">
-          <WeatherCard title="Real Feel" value={`${Math.round(dataClima?.main?.feels_like - difKelvin)}`} unit="°C" />
-          <WeatherCard title="Humidity" value={`${dataClima?.main?.humidity}`} unit="%" />
-          <WeatherCard 
-            title="Wind" 
-            value={`${convertWindSpeed(dataClima?.wind?.speed, getUnitType())}`} 
-            unit={getWindUnit(getUnitType())} 
+          <WeatherCard
+            title="Sensación Térmica"
+            value={displayTemperature(dataClima?.main?.feels_like)}
+            unit={getTemperatureUnit()}
           />
-          <WeatherCard title="Pressure" value={`${dataClima?.main?.pressure}`} unit="hPa" />
+          <WeatherCard
+            title="Humedad"
+            value={`${dataClima?.main?.humidity}`}
+            unit="%"
+          />
+          <WeatherCard
+            title="Viento"
+            value={`${convertWindSpeed(dataClima?.wind?.speed, unidad)}`}
+            unit={getWindUnit(unidad)}
+          />
+          <WeatherCard
+            title="Presión"
+            value={`${dataClima?.main?.pressure}`}
+            unit="hPa"
+          />
         </div>
       </div>
     </div>
   );
 };
-
-
-// import { useState } from "react";
-// import WeatherIcon from "./components/WeatherIcon";
-// import WeatherCard from "./components/WeatherCard";
-// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-// import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
-// import { getName } from "country-list";
-// import { format } from "date-fns";
-// import { es } from "date-fns/locale";
-
-// export const WeatherApp = () => {
-//   const urlBase = "https://api.openweathermap.org/data/2.5/weather";
-//   const API_KEY = import.meta.env.VITE_API_KEY;
-//   const difKelvin = 273.15;
-
-//   const [ciudad, setCiudad] = useState("");
-//   const [dataClima, setdataClima] = useState(null);
-//   const [fechaHora, setFechaHora] = useState("");
-
-//   const handleCambioCiudad = (e) => {
-//     setCiudad(e.target.value);
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     if (ciudad.length > 0) {
-//       await fetchClima();
-//       setCiudad("");
-//     }
-//   };
-
-//   const fetchClima = async () => {
-//     try {
-//       const now = new Date();
-//       const formattedDate = format(now, "EEEE, d 'de' MMMM 'de' yyyy, p", {
-//         locale: es,
-//       });
-//       setFechaHora(formattedDate);
-
-//       const response = await fetch(`${urlBase}?q=${ciudad}&appid=${API_KEY}`);
-//       const data = await response.json();
-//       setdataClima(data);
-//     } catch (error) {
-//       console.error("Ocurrió el siguiente problema: ", error);
-//     }
-//   };
-
-//   return (
-//     <div className="flex items-center justify-center min-h-screen bg-white">
-//       <div className="bg-customGray text-white p-8 w-full sm:w-11/12 md:w-4/5 lg:w-2/5 my-16 mx-auto rounded-lg">
-//         <div className="weather__header flex flex-col md:flex-row justify-between items-center">
-//           <form
-//             onSubmit={handleSubmit}
-//             className="relative w-full md:w-auto mb-4 md:mb-0"
-//           >
-//             <input
-//               type="text"
-//               placeholder="Buscar por ciudad"
-//               className="w-full md:w-auto pl-10 pr-5 py-2 bg-customGray border-none outline-none text-white rounded"
-//               value={ciudad}
-//               onChange={handleCambioCiudad}
-//             />
-//             <FontAwesomeIcon
-//               icon={faMagnifyingGlass}
-//               className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-300"
-//             />
-//           </form>
-//           <div className="text-lg sm:text-xl lg:text-2xl flex items-center">
-//             <span className="mr-2">°C</span>
-//             <span>°F</span>
-//           </div>
-//         </div>
-//         <div className="weather__body flex flex-col items-center justify-center">
-//           {dataClima && (
-//             <div className="text-center mb-4">
-//               <p className="text-4xl mb-2">
-//                 {dataClima.name}, {getName(dataClima.sys.country)}
-//               </p>
-//               <div className="mb-2">
-//                 <p>Fecha y Hora: {fechaHora}</p>
-//               </div>
-//               <div className="mb-2">{dataClima.weather[0].main}</div>
-//               <div className="flex justify-center mb-2">
-//                 <WeatherIcon iconCode={dataClima?.weather[0]?.icon} />
-//               </div>
-//               <p className="text-2xl mb-2">
-//                 Temperatura: {Math.round(dataClima.main.temp - difKelvin)}°C
-//               </p>
-//               <div className="mb-2">
-//                 <p>Min: {Math.round(dataClima.main.temp_min - difKelvin)}°</p>
-//                 <p>Max: {Math.round(dataClima.main.temp_max - difKelvin)}°</p>
-//               </div>
-//             </div>
-//           )}
-//         </div>
-//         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4">
-//           <WeatherCard title="Real Feel" value={dataClima?.main?.feels_like} />
-//           <WeatherCard title="Humidity" value={dataClima?.main?.humidity} />
-//           <WeatherCard title="Wind" value={dataClima?.wind?.speed} />
-//           <WeatherCard title="Pressure" value={dataClima?.main?.pressure} />
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };

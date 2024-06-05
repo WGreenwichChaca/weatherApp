@@ -3,14 +3,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faThermometerHalf, faTint, faWind, faTachometerAlt } from '@fortawesome/free-solid-svg-icons';
 
 const icons = {
-  "Real Feel": faThermometerHalf,
-  "Humidity": faTint,
-  "Wind": faWind,
-  "Pressure": faTachometerAlt
+  "Sensación Térmica": faThermometerHalf,
+  "Humedad": faTint,
+  "Viento": faWind,
+  "Presión": faTachometerAlt
 };
 
 export const WeatherCard = ({ title, value, unit }) => {
-  const displayValue = isNaN(value) ? "N/A" : value;
+  const displayValue = value !== undefined && value !== null && !isNaN(value) ? value : "N/A";
   return (
     <div className="bg-neutral-800 rounded-lg p-4 shadow-md w-full mb-4 mx-auto">
       <div className="text-center flex items-center justify-center">
